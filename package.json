@@ -1,0 +1,45 @@
+{
+  "name": "signalscope-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for SignalScope — AI-powered stock breakout signal detection API",
+  "main": "dist/index.js",
+  "bin": {
+    "signalscope-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "node scripts/test-mcp.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "stocks",
+    "trading",
+    "signals",
+    "breakout",
+    "portfolio",
+    "signalscope",
+    "model-context-protocol"
+  ],
+  "author": "SignalScope <hello@signalscopes.com>",
+  "license": "MIT",
+  "homepage": "https://signalscopes.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/signalscope/cursor-plugin.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

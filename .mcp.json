@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "signalscope": {
+      "command": "npx",
+      "args": ["-y", "signalscope-mcp"],
+      "env": {
+        "SIGNALSCOPE_API_KEY": ""
+      }
+    }
+  }
+}

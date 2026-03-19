@@ -1,0 +1,69 @@
+---
+description: Conventions and domain knowledge for working with the SignalScope API via MCP tools
+alwaysApply: false
+---
+
+# SignalScope API Conventions
+
+## Symbol format
+
+Always pass ticker symbols in UPPERCASE. The MCP tools normalise automatically, but be consistent in output and reasoning (`AAPL`, not `aapl` or `Aapl`).
+
+## Signal stages
+
+| Stage | Meaning | Sources |
+|-------|---------|---------|
+| `EARLY` | Low-conviction — only 1 source detected this ticker | 1 |
+| `FORMING` | Building conviction — 2 sources | 2 |
+| `CONFIRMED` | High-conviction breakout signal | 3+ |
+| `FILTERED` | Pump-and-dump flagged — excluded from default results | — |
+
+Prefer `CONFIRMED` for trade recommendations. `FORMING` is valid for watchlist adds. `EARLY` warrants further research before acting.
+
+## AI score interpretation
+
+| Score | Signal strength |
+|-------|----------------|
+| 70–100 | Strong — high confidence breakout candidate |
+| 50–69 | Moderate — worth monitoring |
+| 0–49 | Weak — low conviction, caution advised |
+
+## P&D flags
+
+If `pndFlagged: true`, the ticker triggered 3+ of SignalScope's 11 pump-and-dump detection rules. Treat these with significant caution. The `pndFlags` array lists which specific flags triggered.
+
+## Pagination defaults
+
+All list endpoints: `page` defaults to `1`, `limit` defaults to `20` (max `100`). Always paginate when a user asks for "all" results — request page by page until `hasMore: false`.
+
+## get_trending filter combinations
+
+Strongest signal list (for trade ideas):
+- `stage: CONFIRMED, trend: rising, hidePnd: true, sortBy: aiScore`
+
+Value/mean-reversion screen:
+- `near52wLow: true, hidePnd: true, sortBy: return`
+
+Sector screen:
+- `sector: <name>, marketCap: micro, sortBy: opportunityScore`
+
+## Workflow order
+
+For a full signal research flow, always go in this sequence:
+1. `search_tickers` or `get_trending` — discover candidates
+2. `get_ticker` — verify the signal is current and review raw signals
+3. `get_ticker_performance` — check historical return after signal detection
+4. `generate_report` — get AI thesis and trade setup
+5. `add_to_watchlist` or `add_position` — track or act
+
+## generate_report caching
+
+`generate_report` generates the report on first call and caches it. Calling it again returns the cached version instantly. If a ticker's situation has changed significantly (new scan, price movement), note this to the user since the report may be stale.
+
+## Closing positions
+
+`update_position` requires BOTH `status: "CLOSED"` AND `closePrice` to close a trade. Passing only one will return a 400 error. Always confirm closePrice with the user before calling.
+
+## Prices cache
+
+`get_prices` caches prices for 5 minutes. For real-time accuracy, inform the user of this limitation if they need precise execution prices.

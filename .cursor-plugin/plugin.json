@@ -1,0 +1,14 @@
+{
+  "name": "signalscope",
+  "version": "1.0.0",
+  "description": "AI-powered stock breakout signal detection. Query trending signals, deep-dive tickers, manage your portfolio and watchlist — all from Cursor via MCP tools.",
+  "author": {
+    "name": "SignalScope",
+    "email": "hello@signalscopes.com"
+  },
+  "homepage": "https://signalscopes.com",
+  "repository": "https://github.com/signalscope/cursor-plugin",
+  "license": "MIT",
+  "keywords": ["stocks", "trading", "signals", "breakout", "portfolio", "finance", "mcp"],
+  "logo": "assets/logo.png"
+}
