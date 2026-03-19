@@ -310,10 +310,10 @@ server.tool(
       .number()
       .int()
       .min(1)
-      .max(100)
-      .default(50)
+      .max(50)
+      .default(30)
       .optional()
-      .describe("Maximum number of nodes to return (default: 50)"),
+      .describe("Maximum number of nodes to return (default: 30, max: 50)"),
   },
   async (params) => {
     const qs = buildQueryString(params as Record<string, string | number | boolean | undefined>);
