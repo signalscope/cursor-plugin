@@ -32,11 +32,11 @@ Two tools work without an API key:
 ## Key Concepts
 
 - **Scan**: A complete harvest run across all sources, producing a set of validated tickers
-- **Signal stage**: How confirmed a breakout signal is
-  - `EARLY` — detected from 1 source
-  - `FORMING` — detected from 2 sources
-  - `CONFIRMED` — detected from 3+ sources
-  - `FILTERED` — flagged as potential pump-and-dump (hidden by default)
+- **Signal stage**: How confirmed a breakout signal is (Emerging → Building → Consensus)
+  - `Emerging` — detected from 1 source
+  - `Building` — detected from 2 sources
+  - `Consensus` — detected from 3+ sources
+  - `Filtered` — flagged as potential pump-and-dump (hidden by default)
 - **AI Score**: 0–100 confidence score. 70+ is strong, 50–70 moderate, below 50 weak
 - **Trending**: Tickers appearing in 2+ scans within 30 days, with trend direction (rising/falling/stable)
 - **P&D flags**: 11 statistical pump-and-dump detection flags; tickers with 3+ flags are staged as FILTERED
@@ -94,7 +94,7 @@ Two tools work without an API key:
 ### Morning signal scan
 
 ```
-1. get_trending (stage: CONFIRMED, trend: rising, hidePnd: true) → find the strongest confirmed breakouts
+1. get_trending (stage: Consensus, trend: rising, hidePnd: true) → find the strongest Consensus-stage breakouts
 2. get_ticker (symbol: <top result>) → deep-dive the leading candidate
 3. generate_report (symbol: <top result>) → get AI thesis + trade setup
 4. add_to_watchlist / add_position → track or enter the trade
@@ -134,7 +134,7 @@ Two tools work without an API key:
 ## Tips
 
 - Symbol lookup is case-insensitive — `aapl` and `AAPL` both work
-- `get_trending` with `trend: rising` and `hidePnd: true` gives the cleanest signal list
+- `get_trending` with `stage: Consensus`, `trend: rising`, and `hidePnd: true` gives the cleanest signal list
 - `generate_report` is cached — the first call generates the report, subsequent calls return instantly
 - Performance data improves over time as more price snapshots accumulate (1d data arrives soonest)
 - Use `get_ticker_related` before opening a position to check what else is moving in the same cluster

@@ -128,9 +128,9 @@ server.tool(
       .optional()
       .describe("Minimum scan appearances (default: 2)"),
     stage: z
-      .enum(["EARLY", "FORMING", "CONFIRMED"])
+      .enum(["Emerging", "Building", "Consensus"])
       .optional()
-      .describe("Filter by signal stage: EARLY (1 source), FORMING (2 sources), CONFIRMED (3+ sources)"),
+      .describe("Filter by signal stage: Emerging (1 source), Building (2 sources), Consensus (3+ sources)"),
     trend: z
       .enum(["rising", "falling", "stable"])
       .optional()
@@ -264,7 +264,7 @@ server.tool(
       .optional()
       .describe("Lookback window in days (default: 30)"),
     stage: z
-      .enum(["EARLY", "FORMING", "CONFIRMED"])
+      .enum(["Emerging", "Building", "Consensus"])
       .optional()
       .describe("Filter related tickers by stage"),
   },
@@ -295,7 +295,7 @@ server.tool(
       .optional()
       .describe("Minimum co-occurrence count for an edge to appear (default: 2)"),
     stage: z
-      .enum(["EARLY", "FORMING", "CONFIRMED"])
+      .enum(["Emerging", "Building", "Consensus"])
       .optional()
       .describe("Filter nodes by signal stage"),
     days: z

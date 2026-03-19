@@ -99,7 +99,7 @@ Add this to your Cursor MCP settings (`.cursor/mcp.json` or via Settings → MCP
 Once installed, try these prompts in Cursor Chat:
 
 **Morning scan:**
-> "Show me the top confirmed breakout signals from SignalScope right now, rising trend only, hiding any P&D flagged ones."
+> "Show me the top Consensus-stage breakout signals from SignalScope right now, rising trend only, hiding any P&D flagged ones."
 
 **Deep dive:**
 > "Get the full SignalScope report for NVDA including the AI trade setup."

@@ -13,12 +13,12 @@ Always pass ticker symbols in UPPERCASE. The MCP tools normalise automatically, 
 
 | Stage | Meaning | Sources |
 |-------|---------|---------|
-| `EARLY` | Low-conviction — only 1 source detected this ticker | 1 |
-| `FORMING` | Building conviction — 2 sources | 2 |
-| `CONFIRMED` | High-conviction breakout signal | 3+ |
-| `FILTERED` | Pump-and-dump flagged — excluded from default results | — |
+| `Emerging` | Low-conviction — only 1 source detected this ticker | 1 |
+| `Building` | Building conviction — 2 sources | 2 |
+| `Consensus` | High-conviction breakout signal | 3+ |
+| `Filtered` | Pump-and-dump flagged — excluded from default results | — |
 
-Prefer `CONFIRMED` for trade recommendations. `FORMING` is valid for watchlist adds. `EARLY` warrants further research before acting.
+Prefer Consensus for trade recommendations. Building is valid for watchlist adds. Emerging warrants further research before acting.
 
 ## AI score interpretation
 
@@ -39,7 +39,7 @@ All list endpoints: `page` defaults to `1`, `limit` defaults to `20` (max `100`)
 ## get_trending filter combinations
 
 Strongest signal list (for trade ideas):
-- `stage: CONFIRMED, trend: rising, hidePnd: true, sortBy: aiScore`
+- `stage: Consensus, trend: rising, hidePnd: true, sortBy: aiScore`
 
 Value/mean-reversion screen:
 - `near52wLow: true, hidePnd: true, sortBy: return`
