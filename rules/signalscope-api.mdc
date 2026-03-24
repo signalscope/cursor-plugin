@@ -5,6 +5,16 @@ alwaysApply: false
 
 # SignalScope API Conventions
 
+## Authentication
+
+Two methods — the MCP server uses whichever is configured:
+
+- **`SIGNALSCOPE_API_KEY`** — subscription-based. Flat rate, full access, daily quota. Generate at signalscopes.com/profile.
+- **`SIGNALSCOPE_WALLET_PRIVATE_KEY`** — x402 pay-per-call in USDC on Base. No account needed. Costs: trending/network $0.01, ticker/history/performance/related $0.005, AI report $0.05.
+
+Free (no auth): `search_tickers`, `get_methodology`.
+API key only (not x402): `list_scans`, `get_scan`, `get_signals`, portfolio, watchlist, prices, stats.
+
 ## Symbol format
 
 Always pass ticker symbols in UPPERCASE. The MCP tools normalise automatically, but be consistent in output and reasoning (`AAPL`, not `aapl` or `Aapl`).
@@ -19,6 +29,13 @@ Always pass ticker symbols in UPPERCASE. The MCP tools normalise automatically, 
 | `Filtered` | Pump-and-dump flagged — excluded from default results | — |
 
 Prefer Consensus for trade recommendations. Building is valid for watchlist adds. Emerging warrants further research before acting.
+
+## AI score vs Opportunity score
+
+- **AI score** (0–100): Evidence strength — how strongly the underlying signals support a breakout thesis
+- **Opportunity score**: Early-mover rank within the scan — how early this ticker was detected relative to others
+
+Both are available in `get_trending` sortBy options (`aiScore`, `opportunityScore`).
 
 ## AI score interpretation
 
@@ -56,6 +73,10 @@ For a full signal research flow, always go in this sequence:
 4. `generate_report` — get AI thesis and trade setup
 5. `add_to_watchlist` or `add_position` — track or act
 
+To drill into raw source content for a scan:
+1. `list_scans` → get scan ID
+2. `get_signals (scanId, stage)` → read actual posts, filings, data points
+
 ## generate_report caching
 
 `generate_report` generates the report on first call and caches it. Calling it again returns the cached version instantly. If a ticker's situation has changed significantly (new scan, price movement), note this to the user since the report may be stale.
@@ -67,3 +88,7 @@ For a full signal research flow, always go in this sequence:
 ## Prices cache
 
 `get_prices` caches prices for 5 minutes. For real-time accuracy, inform the user of this limitation if they need precise execution prices.
+
+## get_portfolio_performance
+
+Returns aggregated return stats across all platform signals with `byScoreRange` (AI score buckets) and `byOpportunityScoreRange` breakdowns, plus weekly cohort data. Use `days` param (1, 3, 7, 30) to select the return horizon. Useful for validating which score ranges historically predict positive returns.

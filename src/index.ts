@@ -7,10 +7,14 @@ import { z } from "zod";
 const BASE_URL =
   process.env.SIGNALSCOPE_BASE_URL ?? "https://signalscopes.com";
 const API_KEY = process.env.SIGNALSCOPE_API_KEY ?? "";
+const WALLET_PRIVATE_KEY = process.env.SIGNALSCOPE_WALLET_PRIVATE_KEY ?? "";
 
 // ---------------------------------------------------------------------------
 // HTTP client
 // ---------------------------------------------------------------------------
+
+// Replaced with x402-aware fetch at startup when SIGNALSCOPE_WALLET_PRIVATE_KEY is set
+let activeFetch: typeof globalThis.fetch = globalThis.fetch;
 
 async function apiFetch(
   path: string,
@@ -23,7 +27,7 @@ async function apiFetch(
   };
   if (API_KEY) headers["x-api-key"] = API_KEY;
 
-  const res = await fetch(url, {
+  const res = await activeFetch(url, {
     method: options.method ?? "GET",
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -42,6 +46,24 @@ async function apiFetch(
       typeof data === "object" && data !== null && "error" in data
         ? String((data as Record<string, unknown>).error)
         : `HTTP ${res.status}`;
+
+    if (res.status === 402) {
+      // Parse price from x402 payment requirements if available
+      const accepts =
+        typeof data === "object" && data !== null && "accepts" in data
+          ? (data as Record<string, unknown>).accepts
+          : null;
+      const priceInfo =
+        Array.isArray(accepts) && accepts[0]
+          ? ` (price: ${(accepts[0] as Record<string, unknown>).maxAmountRequired ?? "unknown"} USDC on Base)`
+          : "";
+      throw new Error(
+        `SignalScope API error: payment required${priceInfo}. ` +
+          `Set SIGNALSCOPE_API_KEY (subscription at signalscopes.com/profile) or ` +
+          `SIGNALSCOPE_WALLET_PRIVATE_KEY with USDC on Base for pay-per-call via x402.`
+      );
+    }
+
     throw new Error(`SignalScope API error: ${msg}`);
   }
 
@@ -70,7 +92,7 @@ function buildQueryString(
 
 const server = new McpServer({
   name: "signalscope",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 // ---------------------------------------------------------------------------
@@ -104,12 +126,12 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Signal data tools (API key required)
+// Signal data tools (API key or x402 required)
 // ---------------------------------------------------------------------------
 
 server.tool(
   "get_trending",
-  "Get trending breakout tickers — symbols appearing in 2+ scans within the last 30 days, with AI scores, performance data, and trend direction. Requires API key.",
+  "Get trending breakout tickers — symbols appearing in 2+ scans within the last 30 days, with AI scores, performance data, and trend direction. Requires API key or x402 payment ($0.01).",
   {
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
     limit: z
@@ -182,7 +204,7 @@ server.tool(
 
 server.tool(
   "get_ticker",
-  "Get the latest validated ticker data for a symbol, including AI score, stage, fundamentals, P&D flags, trade setup, and raw signals. Requires API key.",
+  "Get the latest validated ticker data for a symbol, including AI score, stage, fundamentals, P&D flags, trade setup, and raw signals. Requires API key or x402 payment ($0.005).",
   {
     symbol: z
       .string()
@@ -198,7 +220,7 @@ server.tool(
 
 server.tool(
   "get_ticker_history",
-  "Get the historical scan appearances for a ticker — every scan it was detected in, with scores and stages over time. Requires API key.",
+  "Get the historical scan appearances for a ticker — every scan it was detected in, with scores and stages over time. Requires API key or x402 payment ($0.005).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
@@ -222,7 +244,7 @@ server.tool(
 
 server.tool(
   "get_ticker_performance",
-  "Get price performance data for a ticker — 1-day, 3-day, 7-day, and 30-day returns tracked from the time of signal detection. Requires API key.",
+  "Get price performance data for a ticker — 1-day, 3-day, 7-day, and 30-day returns tracked from the time of signal detection. Requires API key or x402 payment ($0.005).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
   },
@@ -236,7 +258,7 @@ server.tool(
 
 server.tool(
   "get_ticker_related",
-  "Get tickers that frequently co-occur with a given symbol across scans, scored by Jaccard similarity. Useful for finding correlated breakout candidates. Requires API key.",
+  "Get tickers that frequently co-occur with a given symbol across scans, scored by Jaccard similarity. Useful for finding correlated breakout candidates. Requires API key or x402 payment ($0.005).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
@@ -279,7 +301,7 @@ server.tool(
 
 server.tool(
   "get_ticker_network",
-  "Get the co-occurrence network graph for tickers — nodes are tickers, edges are co-occurrence strength. Can be centered on a specific symbol or built from trending tickers. Requires API key.",
+  "Get the co-occurrence network graph for tickers — nodes are tickers, edges are co-occurrence strength. Can be centered on a specific symbol or built from trending tickers. Requires API key or x402 payment ($0.01).",
   {
     symbol: z
       .string()
@@ -324,7 +346,7 @@ server.tool(
 
 server.tool(
   "generate_report",
-  "Generate (or retrieve the cached) AI analysis report and trade setup for a ticker. Includes thesis, risk factors, entry/exit levels, stop loss, targets, timeframe, and risk/reward ratio. Costs $0.05 for first generation; subsequent calls return cached result. Requires API key.",
+  "Generate (or retrieve the cached) AI analysis report and trade setup for a ticker. Includes thesis, risk factors, entry/exit levels, stop loss, targets, timeframe, and risk/reward ratio. Costs $0.05 for first generation; subsequent calls return cached result. Requires API key or x402 payment ($0.05).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
   },
@@ -372,6 +394,23 @@ server.tool(
   async ({ scanId, includeFiltered }) => {
     const qs = buildQueryString({ includeFiltered });
     const data = await apiFetch(`/api/scans/${encodeURIComponent(scanId)}${qs}`);
+    return { content: [{ type: "text", text: toText(data) }] };
+  }
+);
+
+server.tool(
+  "get_signals",
+  "Get raw signals for a specific scan — the individual posts, filings, and data points that triggered detection for each ticker. Returns up to 200 signals sorted by source count then velocity score. Requires API key.",
+  {
+    scanId: z.string().describe("Scan ID (from list_scans)"),
+    stage: z
+      .enum(["Emerging", "Building", "Consensus", "Filtered"])
+      .optional()
+      .describe("Filter signals to tickers at this stage only"),
+  },
+  async ({ scanId, stage }) => {
+    const qs = buildQueryString({ scanId, stage });
+    const data = await apiFetch(`/api/signals${qs}`);
     return { content: [{ type: "text", text: toText(data) }] };
   }
 );
@@ -440,6 +479,23 @@ server.tool(
     const data = await apiFetch(`/api/portfolio/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    return { content: [{ type: "text", text: toText(data) }] };
+  }
+);
+
+server.tool(
+  "get_portfolio_performance",
+  "Get platform-wide portfolio performance statistics — win rate, average return, and median return across all tracked positions, broken down by AI score range, opportunity score range, and weekly cohorts. Requires API key.",
+  {
+    days: z
+      .enum(["1", "3", "7", "30"])
+      .default("7")
+      .optional()
+      .describe("Return horizon in days: 1, 3, 7, or 30 (default: 7)"),
+  },
+  async ({ days }) => {
+    const qs = buildQueryString({ days });
+    const data = await apiFetch(`/api/performance${qs}`);
     return { content: [{ type: "text", text: toText(data) }] };
   }
 );
@@ -524,11 +580,49 @@ server.tool(
 // ---------------------------------------------------------------------------
 
 async function main() {
-  if (!API_KEY) {
+  // Set up x402 pay-per-call if wallet private key is provided
+  if (WALLET_PRIVATE_KEY) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [{ wrapFetchWithPayment, x402Client }, { registerExactEvmScheme }, { privateKeyToAccount }] =
+        (await Promise.all([
+          import("@x402/fetch"),
+          import("@x402/evm/exact/client"),
+          import("viem/accounts"),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ])) as any[];
+
+      const pk = (
+        WALLET_PRIVATE_KEY.startsWith("0x") ? WALLET_PRIVATE_KEY : `0x${WALLET_PRIVATE_KEY}`
+      ) as `0x${string}`;
+      const account = privateKeyToAccount(pk);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = new x402Client();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      registerExactEvmScheme(client, { signer: account as any });
+      activeFetch = wrapFetchWithPayment(
+        globalThis.fetch,
+        client
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as any;
+      process.stderr.write(
+        `[signalscope-mcp] x402 pay-per-call enabled (wallet: ${account.address})\n`
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[signalscope-mcp] Warning: Failed to set up x402 payment client: ${err}\n` +
+          `  Ensure @x402/fetch, @x402/evm, and viem are installed (npm install @x402/fetch @x402/evm viem).\n`
+      );
+    }
+  }
+
+  if (!API_KEY && !WALLET_PRIVATE_KEY) {
     process.stderr.write(
-      "[signalscope-mcp] Warning: SIGNALSCOPE_API_KEY is not set. " +
-        "Only search_tickers and get_methodology will work without an API key. " +
-        "Generate your key at https://signalscopes.com/profile\n"
+      "[signalscope-mcp] Warning: No auth configured. " +
+        "Only search_tickers and get_methodology will work. " +
+        "Options:\n" +
+        "  • SIGNALSCOPE_API_KEY — generate at signalscopes.com/profile (subscription required)\n" +
+        "  • SIGNALSCOPE_WALLET_PRIVATE_KEY — pay per call in USDC on Base via x402\n"
     );
   }
 

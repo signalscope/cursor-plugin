@@ -16,18 +16,24 @@ SignalScope aggregates signals from social media, SEC filings, congressional tra
 
 Install from the [Cursor Marketplace](https://cursor.com/marketplace) by searching for **SignalScope**.
 
-After installation, add your API key:
+After installation, configure authentication (pick one):
 
+**Option A — API key** (subscription required):
 1. Open Cursor Settings → **Features** → **Model Context Protocol**
 2. Find the `signalscope` server and click the gear icon
 3. Set `SIGNALSCOPE_API_KEY` to your key
 
-**Get your API key:**
+To get your API key:
 1. Create an account at [signalscopes.com](https://signalscopes.com)
 2. Go to your [Profile page](https://signalscopes.com/profile)
 3. Click **Generate API Key** and copy it (shown only once)
 
-> **Note:** `search_tickers` and `get_methodology` work without an API key. All other tools require one.
+**Option B — x402 pay-per-call** (no subscription needed):
+1. Set `SIGNALSCOPE_WALLET_PRIVATE_KEY` to an Ethereum wallet private key with USDC on Base
+2. Each API call deducts a small USDC amount automatically (e.g. $0.005–$0.05 per call)
+3. No account or registration required
+
+> **Note:** `search_tickers` and `get_methodology` are always free — no auth needed.
 
 ## Manual Installation (without Marketplace)
 
@@ -47,6 +53,11 @@ Add this to your Cursor MCP settings (`.cursor/mcp.json` or via Settings → MCP
 }
 ```
 
+For x402 pay-per-call, replace `SIGNALSCOPE_API_KEY` with:
+```json
+"SIGNALSCOPE_WALLET_PRIVATE_KEY": "your_ethereum_private_key"
+```
+
 ## Available Tools
 
 ### Discovery (free — no API key)
@@ -60,15 +71,16 @@ Add this to your Cursor MCP settings (`.cursor/mcp.json` or via Settings → MCP
 
 | Tool | Description |
 |------|-------------|
-| `get_trending` | Trending breakout tickers with filtering by stage, trend, market cap, sector, source |
-| `get_ticker` | Latest validated data + raw signals for a symbol |
-| `get_ticker_history` | Historical scan appearances |
-| `get_ticker_performance` | Price performance — 1d, 3d, 7d, 30d returns since signal detection |
-| `get_ticker_related` | Co-occurring tickers with Jaccard similarity scores |
-| `get_ticker_network` | Co-occurrence network graph |
-| `generate_report` | AI report + trade setup (entry range, stop loss, targets, risk/reward) |
+| `get_trending` | Trending breakout tickers with filtering by stage, trend, market cap, sector, source — x402: $0.01 |
+| `get_ticker` | Latest validated data + raw signals for a symbol — x402: $0.005 |
+| `get_ticker_history` | Historical scan appearances — x402: $0.005 |
+| `get_ticker_performance` | Price performance — 1d, 3d, 7d, 30d returns since signal detection — x402: $0.005 |
+| `get_ticker_related` | Co-occurring tickers with Jaccard similarity scores — x402: $0.005 |
+| `get_ticker_network` | Co-occurrence network graph — x402: $0.01 |
+| `generate_report` | AI report + trade setup (entry range, stop loss, targets, risk/reward) — x402: $0.05 |
 | `list_scans` | List recent harvest scans |
 | `get_scan` | Detail of a specific scan with all validated tickers |
+| `get_signals` | Raw signals (posts, filings, data points) for a specific scan |
 
 ### Portfolio
 
@@ -78,6 +90,7 @@ Add this to your Cursor MCP settings (`.cursor/mcp.json` or via Settings → MCP
 | `add_position` | Open a new position |
 | `update_position` | Update or close a position |
 | `delete_position` | Delete a position |
+| `get_portfolio_performance` | Platform-wide performance stats — win rate, avg return by AI score range and weekly cohort |
 
 ### Watchlist
 
@@ -112,6 +125,9 @@ Once installed, try these prompts in Cursor Chat:
 
 **Correlation research:**
 > "What tickers co-occur most with AMD in SignalScope signals?"
+
+**Track platform accuracy:**
+> "Show me the 7-day performance stats from SignalScope — win rate and average return."
 
 
 

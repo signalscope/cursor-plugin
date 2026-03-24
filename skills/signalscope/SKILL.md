@@ -18,14 +18,13 @@ SignalScope is a stock breakout signal detection platform. It harvests signals f
 
 ## Authentication
 
-All MCP tools use your API key configured as `SIGNALSCOPE_API_KEY` in the MCP server environment. You only need to set this once in the plugin settings.
+Two auth methods — configure one in the MCP server environment:
 
-To get your API key:
-1. Create an account at signalscopes.com
-2. Go to your Profile page
-3. Click "Generate API Key" and copy it (shown only once)
+**API key** (`SIGNALSCOPE_API_KEY`): Requires a SignalScope subscription. Generate at signalscopes.com/profile. Flat monthly/yearly rate with full access and a daily API request quota.
 
-Two tools work without an API key:
+**x402 pay-per-call** (`SIGNALSCOPE_WALLET_PRIVATE_KEY`): No account or subscription needed. Set an Ethereum wallet private key with USDC on Base. Each call deducts a small amount automatically ($0.005–$0.05 depending on endpoint). Costs are per-request only — no fixed fees.
+
+Two tools always work without any auth:
 - `search_tickers` — free symbol discovery
 - `get_methodology` — platform methodology
 
@@ -38,6 +37,7 @@ Two tools work without an API key:
   - `Consensus` — detected from 3+ sources
   - `Filtered` — flagged as potential pump-and-dump (hidden by default)
 - **AI Score**: 0–100 confidence score. 70+ is strong, 50–70 moderate, below 50 weak
+- **Opportunity Score**: Early-mover rank within the scan (separate from AI score)
 - **Trending**: Tickers appearing in 2+ scans within 30 days, with trend direction (rising/falling/stable)
 - **P&D flags**: 11 statistical pump-and-dump detection flags; tickers with 3+ flags are staged as FILTERED
 - **Trade setup**: AI-generated entry range, stop loss, targets, timeframe, and risk/reward ratio — available for Buy/Strong Buy recommendations
@@ -51,19 +51,22 @@ Two tools work without an API key:
 | `search_tickers` | Search by symbol or partial name — returns up to 8 results with AI score, stage, and price |
 | `get_methodology` | Platform methodology and scoring pipeline details |
 
-### Signal Data (API key required)
+### Signal Data (API key or x402 required)
 
-| Tool | Description |
-|------|-------------|
-| `get_trending` | Trending breakout tickers with rich filtering (stage, trend, market cap, sector, source, etc.) |
-| `get_ticker` | Latest validated data + raw signals for a symbol |
-| `get_ticker_history` | Historical scan appearances for a ticker |
-| `get_ticker_performance` | Price performance — 1d, 3d, 7d, 30d returns since signal detection |
-| `get_ticker_related` | Co-occurring tickers with Jaccard similarity scores |
-| `get_ticker_network` | Co-occurrence network graph (nodes = tickers, edges = co-occurrence strength) |
-| `generate_report` | AI report + trade setup with entry range, stop loss, targets, risk/reward |
-| `list_scans` | List recent harvest scans |
-| `get_scan` | Detail of a specific scan with all validated tickers |
+| Tool | x402 cost | Description |
+|------|-----------|-------------|
+| `get_trending` | $0.01 | Trending breakout tickers with rich filtering (stage, trend, market cap, sector, source, etc.) |
+| `get_ticker` | $0.005 | Latest validated data + raw signals for a symbol |
+| `get_ticker_history` | $0.005 | Historical scan appearances for a ticker |
+| `get_ticker_performance` | $0.005 | Price performance — 1d, 3d, 7d, 30d returns since signal detection |
+| `get_ticker_related` | $0.005 | Co-occurring tickers with Jaccard similarity scores |
+| `get_ticker_network` | $0.01 | Co-occurrence network graph (nodes = tickers, edges = co-occurrence strength) |
+| `generate_report` | $0.05 | AI report + trade setup with entry range, stop loss, targets, risk/reward |
+| `list_scans` | free* | List recent harvest scans |
+| `get_scan` | free* | Detail of a specific scan with all validated tickers |
+| `get_signals` | free* | Raw signals (individual posts, filings, data points) for a scan |
+
+*API key required; not monetized via x402.
 
 ### Portfolio (API key required)
 
@@ -73,6 +76,7 @@ Two tools work without an API key:
 | `add_position` | Open a new position (symbol, entryPrice, shares, notes) |
 | `update_position` | Update or close a position (set status: CLOSED + closePrice to close) |
 | `delete_position` | Permanently delete a position |
+| `get_portfolio_performance` | Platform-wide performance stats — win rate, avg/median return by AI score range and weekly cohort |
 
 ### Watchlist (API key required)
 
@@ -127,8 +131,16 @@ Two tools work without an API key:
 ### Track platform accuracy
 
 ```
-1. get_platform_stats → overview of scan and signal counts
+1. get_portfolio_performance (days: "7") → platform win rate and average 7-day return
 2. get_trending (sortBy: return, returnPeriod: 7d) → rank signals by 7-day performance
+```
+
+### Drill into a scan's raw signals
+
+```
+1. list_scans → get recent scan IDs
+2. get_scan (scanId: <id>) → see all validated tickers for that scan
+3. get_signals (scanId: <id>, stage: Consensus) → read the actual posts/filings that triggered detection
 ```
 
 ## Tips
@@ -139,6 +151,8 @@ Two tools work without an API key:
 - Performance data improves over time as more price snapshots accumulate (1d data arrives soonest)
 - Use `get_ticker_related` before opening a position to check what else is moving in the same cluster
 - `near52wLow: true` in `get_trending` surfaces potential mean-reversion setups alongside breakouts
+- Use `get_signals` after `get_scan` to read the actual source content (post titles, filing descriptions) that triggered each ticker
+- `get_portfolio_performance` shows `byScoreRange` (AI score) and `byOpportunityScoreRange` breakdowns — useful for calibrating which score thresholds historically predict returns
 
 ## Error Handling
 
@@ -148,5 +162,6 @@ All tools return JSON errors with an `error` field on failure:
 |--------|---------|
 | 400 | Bad request — check `details` for validation issues |
 | 401 | Not authenticated — SIGNALSCOPE_API_KEY is missing or invalid |
+| 402 | Payment required — set SIGNALSCOPE_WALLET_PRIVATE_KEY with USDC on Base, or use an API key |
 | 404 | Ticker or resource not found |
 | 500 | Server error |
