@@ -10,7 +10,7 @@ SignalScope gives Cursor AI agents direct access to stock breakout signals via M
 
 ## What is SignalScope?
 
-SignalScope aggregates signals from social media, SEC filings, congressional trades, options flow, and volume spikes. It scores candidates with AI, filters pump-and-dump patterns, and surfaces validated tickers ranked by confidence and stage.
+SignalScope aggregates signals from social media, SEC filings, congressional trades, options flow, volume spikes, and Polymarket. It scores candidates with AI, filters pump-and-dump patterns, and surfaces validated tickers with **opportunityScore** (early-mover rank) and **aiScore** (evidence confidence).
 
 ## Installation
 
@@ -33,7 +33,7 @@ To get your API key:
 2. Each API call deducts a small USDC amount automatically (e.g. $0.005–$0.05 per call)
 3. No account or registration required
 
-> **Note:** `search_tickers` and `get_methodology` are always free — no auth needed.
+> **Note:** `search_tickers`, `get_methodology`, `list_scans`, `get_scan`, `get_signals`, and `get_platform_stats` are public (no key). Monetized ticker endpoints need an API key (subscriber) or x402. **`generate_report` cannot be generated with an API key** — use x402 ($0.05) or sign in on the site (Pro to generate new reports; cached reports may be returned for subscribers).
 
 ## Manual Installation (without Marketplace)
 
@@ -64,7 +64,7 @@ For x402 pay-per-call, replace `SIGNALSCOPE_API_KEY` with:
 
 | Tool | Description |
 |------|-------------|
-| `search_tickers` | Search by symbol or partial name — up to 8 results with AI score, stage, and price |
+| `search_tickers` | Search by symbol or partial name — up to 8 results with aiScore, opportunityScore, stage, and price |
 | `get_methodology` | Platform methodology and scoring pipeline details |
 
 ### Signal Data
@@ -73,14 +73,14 @@ For x402 pay-per-call, replace `SIGNALSCOPE_API_KEY` with:
 |------|-------------|
 | `get_trending` | Trending breakout tickers with filtering by stage, trend, market cap, sector, source — x402: $0.01 |
 | `get_ticker` | Latest validated data + raw signals for a symbol — x402: $0.005 |
-| `get_ticker_history` | Historical scan appearances — x402: $0.005 |
+| `get_ticker_history` | Historical scan appearances (full list, no pagination) — x402: $0.005 |
 | `get_ticker_performance` | Price performance — 1d, 3d, 7d, 30d returns since signal detection — x402: $0.005 |
-| `get_ticker_related` | Co-occurring tickers with Jaccard similarity scores — x402: $0.005 |
-| `get_ticker_network` | Co-occurrence network graph — x402: $0.01 |
-| `generate_report` | AI report + trade setup (entry range, stop loss, targets, risk/reward) — x402: $0.05 |
-| `list_scans` | List recent harvest scans |
-| `get_scan` | Detail of a specific scan with all validated tickers |
-| `get_signals` | Raw signals (posts, filings, data points) for a specific scan |
+| `get_ticker_related` | Scan co-occurrence candidates ranked by Pearson price correlation — x402: $0.005 |
+| `get_ticker_network` | Price-correlation graph (`minCorrelation` 0–1); nodes seeded by co-occurrence or trending — x402: $0.01 |
+| `generate_report` | AI report + trade setup — **x402 $0.05** or browser session (not via `x-api-key`) |
+| `list_scans` | List recent harvest scans (public) |
+| `get_scan` | One scan with validated tickers (public) |
+| `get_signals` | Raw signals for a scan (public) |
 
 ### Portfolio
 
@@ -104,8 +104,8 @@ For x402 pay-per-call, replace `SIGNALSCOPE_API_KEY` with:
 
 | Tool | Description |
 |------|-------------|
-| `get_prices` | Current prices for up to 50 symbols (5-min cache) |
-| `get_platform_stats` | Platform-wide stats |
+| `get_prices` | Current prices for up to 50 symbols (5-min cache); auth optional |
+| `get_platform_stats` | Scan count, signal sum, distinct ticker count (public, rate-limited) |
 
 ## Example Prompts
 

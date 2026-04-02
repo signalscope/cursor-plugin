@@ -1,6 +1,6 @@
 {
   "name": "signalscope-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server for SignalScope — AI-powered stock breakout signal detection API",
   "main": "dist/index.js",
   "bin": {
@@ -36,7 +36,8 @@
     "@modelcontextprotocol/sdk": "^1.10.1",
     "@x402/evm": "^2.7.0",
     "@x402/fetch": "^2.7.0",
-    "viem": "^2.47.6"
+    "viem": "^2.47.6",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

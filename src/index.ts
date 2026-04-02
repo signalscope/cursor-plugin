@@ -57,8 +57,11 @@ async function apiFetch(
         Array.isArray(accepts) && accepts[0]
           ? ` (price: ${(accepts[0] as Record<string, unknown>).maxAmountRequired ?? "unknown"} USDC on Base)`
           : "";
+      const reportHint = path.includes("/report")
+        ? " POST /api/tickers/.../report is not available with API key alone — use x402 or the website. "
+        : "";
       throw new Error(
-        `SignalScope API error: payment required${priceInfo}. ` +
+        `SignalScope API error: payment required${priceInfo}. ${reportHint}` +
           `Set SIGNALSCOPE_API_KEY (subscription at signalscopes.com/profile) or ` +
           `SIGNALSCOPE_WALLET_PRIVATE_KEY with USDC on Base for pay-per-call via x402.`
       );
@@ -92,7 +95,7 @@ function buildQueryString(
 
 const server = new McpServer({
   name: "signalscope",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 // ---------------------------------------------------------------------------
@@ -101,7 +104,7 @@ const server = new McpServer({
 
 server.tool(
   "search_tickers",
-  "Search SignalScope tickers by symbol or partial name. Free endpoint — no API key required. Returns up to 8 matching tickers with AI score, signal stage, and current price.",
+  "Search SignalScope tickers by symbol or partial name. Free endpoint — no API key required. Returns up to 8 matches with aiScore, opportunityScore (null if not yet validated), stage, and price.",
   {
     query: z
       .string()
@@ -131,7 +134,7 @@ server.tool(
 
 server.tool(
   "get_trending",
-  "Get trending breakout tickers — symbols appearing in 2+ scans within the last 30 days, with AI scores, performance data, and trend direction. Requires API key or x402 payment ($0.01).",
+  "Get trending breakout tickers — symbols appearing in 2+ scans within the last 30 days, with aiScore, opportunityScore, performance, and trend (rising/falling/stable from score history). Paid: API key (subscriber) or x402 ($0.01). summary.avgScore is mean aiScore only.",
   {
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
     limit: z
@@ -176,6 +179,7 @@ server.tool(
         "CONGRESS",
         "VOLUME_SPIKE",
         "OPTIONS_FLOW",
+        "POLYMARKET",
       ])
       .optional()
       .describe("Filter by signal source"),
@@ -204,7 +208,7 @@ server.tool(
 
 server.tool(
   "get_ticker",
-  "Get the latest validated ticker data for a symbol, including AI score, stage, fundamentals, P&D flags, trade setup, and raw signals. Requires API key or x402 payment ($0.005).",
+  "Get the latest validated ticker row plus raw signals. Includes opportunityScore (early-mover rank) and aiScore (evidence confidence — not expected returns), stage, fundamentals, P&D fields, cached report fields if present, and signals[]. Paid: API key or x402 ($0.005).",
   {
     symbol: z
       .string()
@@ -220,23 +224,13 @@ server.tool(
 
 server.tool(
   "get_ticker_history",
-  "Get the historical scan appearances for a ticker — every scan it was detected in, with scores and stages over time. Requires API key or x402 payment ($0.005).",
+  "Get historical scan appearances for a ticker (up to ~90 completed scans), ordered by scan time. Each row: scanId, startedAt, aiScore, stage, price, signalCount, sourceCount, recommendation. No server-side pagination — the API returns the full list. Paid: API key or x402 ($0.005).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
-    page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(20)
-      .optional()
-      .describe("Results per page (default: 20)"),
   },
-  async ({ symbol, page, limit }) => {
-    const qs = buildQueryString({ page, limit });
+  async ({ symbol }) => {
     const data = await apiFetch(
-      `/api/tickers/${encodeURIComponent(symbol.toUpperCase())}/history${qs}`
+      `/api/tickers/${encodeURIComponent(symbol.toUpperCase())}/history`
     );
     return { content: [{ type: "text", text: toText(data) }] };
   }
@@ -258,7 +252,7 @@ server.tool(
 
 server.tool(
   "get_ticker_related",
-  "Get tickers that frequently co-occur with a given symbol across scans, scored by Jaccard similarity. Useful for finding correlated breakout candidates. Requires API key or x402 payment ($0.005).",
+  "Co-occurring scan symbols ranked by Pearson price correlation vs target (correlationScore). latestAiScore is AI confidence only; use get_ticker for opportunityScore. API key or x402 ($0.005).",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
@@ -301,7 +295,7 @@ server.tool(
 
 server.tool(
   "get_ticker_network",
-  "Get the co-occurrence network graph for tickers — nodes are tickers, edges are co-occurrence strength. Can be centered on a specific symbol or built from trending tickers. Requires API key or x402 payment ($0.01).",
+  "Price-correlation graph: nodes from co-occurrence or top trending; edges above minCorrelation (0–1). Omit symbol for trending-based graph. API key or x402 ($0.01).",
   {
     symbol: z
       .string()
@@ -309,13 +303,13 @@ server.tool(
       .max(10)
       .optional()
       .describe("Center the network on this symbol (optional — omit for trending-based network)"),
-    minWeight: z
+    minCorrelation: z
       .number()
-      .int()
-      .min(1)
-      .default(2)
+      .min(0)
+      .max(1)
+      .default(0.3)
       .optional()
-      .describe("Minimum co-occurrence count for an edge to appear (default: 2)"),
+      .describe("Minimum absolute correlation (0–1) for an edge (default: 0.3)"),
     stage: z
       .enum(["Emerging", "Building", "Consensus"])
       .optional()
@@ -331,11 +325,11 @@ server.tool(
     maxNodes: z
       .number()
       .int()
-      .min(1)
+      .min(2)
       .max(50)
       .default(30)
       .optional()
-      .describe("Maximum number of nodes to return (default: 30, max: 50)"),
+      .describe("Maximum nodes (default: 30, min: 2, max: 50)"),
   },
   async (params) => {
     const qs = buildQueryString(params as Record<string, string | number | boolean | undefined>);
@@ -346,7 +340,7 @@ server.tool(
 
 server.tool(
   "generate_report",
-  "Generate (or retrieve the cached) AI analysis report and trade setup for a ticker. Includes thesis, risk factors, entry/exit levels, stop loss, targets, timeframe, and risk/reward ratio. Costs $0.05 for first generation; subsequent calls return cached result. Requires API key or x402 payment ($0.05).",
+  "AI report + trade setup. Not available via x-api-key (403). Use x402 ($0.05) or website; Pro to generate new reports; cached may load when signed in. POST.",
   {
     symbol: z.string().min(1).max(10).describe("Ticker symbol"),
   },
@@ -361,7 +355,7 @@ server.tool(
 
 server.tool(
   "list_scans",
-  "List recent SignalScope harvest scans (paginated). Each scan represents one complete signal harvesting run across all sources. Requires API key.",
+  "List harvest scans (paginated). Public. Paid ticker routes still need API key or x402.",
   {
     page: z.number().int().min(1).default(1).optional().describe("Page number (default: 1)"),
     limit: z
@@ -382,7 +376,7 @@ server.tool(
 
 server.tool(
   "get_scan",
-  "Get the detail of a specific harvest scan — all validated tickers with scores, stages, and fundamentals. Requires API key.",
+  "One scan with validated tickers (aiScore desc, opportunityScore tiebreak). Public.",
   {
     scanId: z.string().describe("Scan ID (from list_scans)"),
     includeFiltered: z
@@ -400,7 +394,7 @@ server.tool(
 
 server.tool(
   "get_signals",
-  "Get raw signals for a specific scan — the individual posts, filings, and data points that triggered detection for each ticker. Returns up to 200 signals sorted by source count then velocity score. Requires API key.",
+  "Raw signals for a scan (max 200), by source count then velocity. Public.",
   {
     scanId: z.string().describe("Scan ID (from list_scans)"),
     stage: z
@@ -449,7 +443,7 @@ server.tool(
 
 server.tool(
   "update_position",
-  "Update an existing portfolio position — change notes, or close it with a close price. To close: set status to 'CLOSED' and provide closePrice. Requires API key.",
+  "Update position: notes, entryPrice, shares, or close (status CLOSED + closePrice). API key required.",
   {
     id: z.string().describe("Position ID (from list_portfolio)"),
     status: z.enum(["OPEN", "CLOSED"]).optional().describe("Set to 'CLOSED' to close the position"),
@@ -458,12 +452,14 @@ server.tool(
       .positive()
       .optional()
       .describe("Close price per share — required when status is 'CLOSED'"),
+    entryPrice: z.number().positive().optional().describe("Updated entry price per share"),
+    shares: z.number().positive().optional().describe("Updated share count"),
     notes: z.string().max(500).optional().describe("Updated notes"),
   },
-  async ({ id, status, closePrice, notes }) => {
+  async ({ id, status, closePrice, entryPrice, shares, notes }) => {
     const data = await apiFetch(`/api/portfolio/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      body: { status, closePrice, notes },
+      body: { status, closePrice, entryPrice, shares, notes },
     });
     return { content: [{ type: "text", text: toText(data) }] };
   }
@@ -550,7 +546,7 @@ server.tool(
 
 server.tool(
   "get_prices",
-  "Get current prices for one or more ticker symbols (cached for 5 minutes). Maximum 50 symbols per call. Requires API key.",
+  "Current prices for up to 50 symbols (5-minute cache). Auth optional.",
   {
     symbols: z
       .array(z.string().min(1).max(10))
@@ -567,7 +563,7 @@ server.tool(
 
 server.tool(
   "get_platform_stats",
-  "Get platform-wide SignalScope statistics — total scans, signals, validated tickers, and registered users. Requires API key.",
+  "Platform stats: completed scans, summed signal counts, distinct validated tickers. Public (rate-limited).",
   {},
   async () => {
     const data = await apiFetch("/api/stats");
@@ -619,10 +615,10 @@ async function main() {
   if (!API_KEY && !WALLET_PRIVATE_KEY) {
     process.stderr.write(
       "[signalscope-mcp] Warning: No auth configured. " +
-        "Only search_tickers and get_methodology will work. " +
-        "Options:\n" +
-        "  • SIGNALSCOPE_API_KEY — generate at signalscopes.com/profile (subscription required)\n" +
-        "  • SIGNALSCOPE_WALLET_PRIVATE_KEY — pay per call in USDC on Base via x402\n"
+        "Public tools: search_tickers, get_methodology, list_scans, get_scan, get_signals, get_platform_stats. " +
+        "Paid ticker tools need API key or x402 wallet.\n" +
+        "  • SIGNALSCOPE_API_KEY — signalscopes.com/profile (subscription)\n" +
+        "  • SIGNALSCOPE_WALLET_PRIVATE_KEY — USDC on Base (x402)\n"
     );
   }
 

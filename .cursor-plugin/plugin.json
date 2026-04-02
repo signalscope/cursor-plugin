@@ -1,6 +1,6 @@
 {
   "name": "signalscope",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "AI-powered stock breakout signal detection. Query trending signals, deep-dive tickers, manage your portfolio and watchlist — all from Cursor via MCP tools.",
   "author": {
     "name": "SignalScope",

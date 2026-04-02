@@ -81,7 +81,21 @@ async function run() {
     console.log("\n✓ get_methodology:", methodOk ? "OK" : "unexpected shape");
 
     if (!API_KEY) {
-      console.log("\n⚠ API key not set — skipping authenticated tools");
+      const scansRes = await client.callTool({
+        name: "list_scans",
+        arguments: { page: 1, limit: 1 },
+      });
+      const scansData = parseToolResult(scansRes);
+      const scansOk = Array.isArray(scansData.scans);
+      console.log("\n✓ list_scans (no API key):", scansOk ? `${scansData.scans.length} scan(s)` : "unexpected");
+
+      const statsRes = await client.callTool({ name: "get_platform_stats", arguments: {} });
+      const statsData = parseToolResult(statsRes);
+      const statsOk =
+        typeof statsData.scans === "number" && typeof statsData.tickers === "number";
+      console.log("✓ get_platform_stats (no API key):", statsOk ? "OK" : "unexpected");
+
+      console.log("\n⚠ API key not set — skipping authenticated / paid ticker tools");
       await transport.close();
       process.exit(0);
     }
@@ -105,7 +119,11 @@ async function run() {
     });
     const statsData = parseToolResult(statsRes);
     if (isApiError(statsData)) throw new Error(`get_platform_stats failed: ${statsData.raw ?? statsData.error}`);
-    console.log("\n✓ get_platform_stats:", typeof statsData.scanCount === "number" ? "OK" : JSON.stringify(statsData).slice(0, 60) + "...");
+    const statsOk =
+      typeof statsData.scans === "number" &&
+      typeof statsData.signals === "number" &&
+      typeof statsData.tickers === "number";
+    console.log("\n✓ get_platform_stats:", statsOk ? "OK" : JSON.stringify(statsData).slice(0, 80) + "...");
 
     // 6. list_scans
     const scansRes = await client.callTool({
@@ -124,16 +142,17 @@ async function run() {
     });
     const tickerData = parseToolResult(tickerRes);
     if (isApiError(tickerData)) throw new Error(`get_ticker failed: ${tickerData.raw ?? tickerData.error}`);
-    console.log("\n✓ get_ticker('AAPL'):", tickerData.symbol != null || tickerData.error != null ? "OK" : "unexpected");
+    const tickerOk = tickerData.ticker?.symbol != null || tickerData.error != null;
+    console.log("\n✓ get_ticker('AAPL'):", tickerOk ? "OK" : "unexpected");
 
     // 8. get_ticker_history
     const histRes = await client.callTool({
       name: "get_ticker_history",
-      arguments: { symbol: "AAPL", limit: 2 },
+      arguments: { symbol: "AAPL" },
     });
     const histData = parseToolResult(histRes);
     if (isApiError(histData)) throw new Error(`get_ticker_history failed: ${histData.raw ?? histData.error}`);
-    console.log("✓ get_ticker_history('AAPL'):", Array.isArray(histData.appearances ?? histData.data) ? "OK" : "unexpected");
+    console.log("✓ get_ticker_history('AAPL'):", Array.isArray(histData.history) ? "OK" : "unexpected");
 
     // 9. get_ticker_performance
     const perfRes = await client.callTool({
@@ -142,7 +161,11 @@ async function run() {
     });
     const perfData = parseToolResult(perfRes);
     if (isApiError(perfData)) throw new Error(`get_ticker_performance failed: ${perfData.raw ?? perfData.error}`);
-    console.log("✓ get_ticker_performance('AAPL'):", perfData.symbol != null || perfData.return1d != null || perfData.error != null ? "OK" : "unexpected");
+    const perfOk =
+      perfData.latest?.symbol != null ||
+      perfData.return1d != null ||
+      perfData.error != null;
+    console.log("✓ get_ticker_performance('AAPL'):", perfOk ? "OK" : "unexpected");
 
     // 10. get_ticker_related
     const relatedRes = await client.callTool({
@@ -151,7 +174,10 @@ async function run() {
     });
     const relatedData = parseToolResult(relatedRes);
     if (isApiError(relatedData)) throw new Error(`get_ticker_related failed: ${relatedData.raw ?? relatedData.error}`);
-    console.log("✓ get_ticker_related('AAPL'):", Array.isArray(relatedData.related ?? relatedData.data) ? "OK" : "unexpected");
+    console.log(
+      "✓ get_ticker_related('AAPL'):",
+      Array.isArray(relatedData.relatedTickers) ? "OK" : "unexpected"
+    );
 
     // 11. get_ticker_network (no symbol = trending-based)
     const networkRes = await client.callTool({
